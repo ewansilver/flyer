@@ -1,0 +1,12 @@
+{application, fly,
+ [
+  {description, "A Fly server."},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { fly, []}},
+  {env, []}
+ ]}.

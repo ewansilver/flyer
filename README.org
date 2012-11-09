@@ -1,0 +1,17 @@
+#+SETUPFILE: "doc/basho-doc-style.iorg"
+
+Fly client for Fly Object Space: http://www.flyobjectspace.com/
+
+* Getting Started
+
+Build and run tests:
+#+BEGIN_EXAMPLE
+./build_and_test.sh
+#+END_EXAMPLE
+
+** Work in progress
+
+This is obviously work in progress. Moved over from https://bitbucket.org/fly_er/flyer/
+
+It has no OTP support, etc. Just the basic binary protocol wrapped in a simple spawned process.s
+
