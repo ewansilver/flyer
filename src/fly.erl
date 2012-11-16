@@ -63,7 +63,7 @@ close(State) ->
 	
 %% Return: {ping,[tagnames]}
 ping(State) ->
-	Header = <<16#FAB10000:?ZnInt>>,
+	Header = <<16#FAB20000:?ZnInt>>,
     ok = gen_tcp:send(State#state.socket, Header),
 	{ok,<<_TagCount:?ZnLong>>} = gen_tcp:recv(State#state.socket,8),
 	{ok,Response} = gen_tcp:recv(State#state.socket,0),
@@ -75,7 +75,7 @@ read(State,Type_name, Template, Wait_time) ->
 		false -> {fail, missing_type};
 		{value,{_,Type_channel,_,Field_info}} ->
 			Template_entry = create_Zn_entry(Template),
-			Header = <<16#FAB10001:?ZnInt>>,
+			Header = <<16#FAB20001:?ZnInt>>,
 			Binary = <<Header/binary,Type_channel:?ZnInt, Template_entry/binary,Wait_time:?ZnLong>>,
 			parse_single_entry_responses(read,State#state.socket,Field_info,Binary,Wait_time)
 	end.
@@ -86,7 +86,7 @@ take(State,Type_name, Template, Wait_time) ->
 		false -> {fail, missing_type};
 		{value,{_,Type_channel,_,Field_info}} ->
 			Template_entry = create_Zn_entry(Template),
-			Header = <<16#FAB10002:?ZnInt>>,
+			Header = <<16#FAB20002:?ZnInt>>,
 			Binary = <<Header/binary,Type_channel:?ZnInt, Template_entry/binary,Wait_time:?ZnLong>>,
 			parse_single_entry_responses(take,State#state.socket,Field_info, Binary, Wait_time)
 	end.
@@ -118,7 +118,7 @@ write(State,Type_name, Template, Lease) ->
 		false -> {fail, missing_type};
 		{value,{_,Type_channel,_,_}} ->
 			Template_entry = create_Zn_entry(Template),
-			Header = <<16#FAB10003:?ZnInt>>,
+			Header = <<16#FAB20003:?ZnInt>>,
 		    ok = gen_tcp:send(State#state.socket, <<Header/binary,Type_channel:?ZnInt, Template_entry/binary,Lease:?ZnLong>>),
 			{ok,<<Lease_granted:?ZnLong>>} = gen_tcp:recv(State#state.socket,8),
 			{write,Lease_granted}
@@ -130,7 +130,7 @@ read_many(State,Type_name, Template, Limit) ->
 		false -> {fail, missing_type};
 		{value,{_,Type_channel,_,Field_info}} ->
 			Template_entry = create_Zn_entry(Template),
-			Header = <<16#FAB10006:?ZnInt>>,
+			Header = <<16#FAB20006:?ZnInt>>,
 %% Question: what is ignore for?
 			Ignore = 0,
 		    ok = gen_tcp:send(State#state.socket,
@@ -144,7 +144,7 @@ take_many(State,Type_name, Template, Limit) ->
 		false -> {fail, missing_type};
 		{value,{_,Type_channel,_,Field_info}} ->
 			Template_entry = create_Zn_entry(Template),
-			Header = <<16#FAB10007:?ZnInt>>,
+			Header = <<16#FAB20007:?ZnInt>>,
 		    ok = gen_tcp:send(State#state.socket, 
 						<<Header/binary,Type_channel:?ZnInt, Template_entry/binary,Limit:?ZnLong>>),
 			parse_multiple_entry_responses(take_many,State#state.socket,Field_info)
@@ -165,7 +165,7 @@ register_entry(State,{Typename,FieldInfo}) ->
 register_entry(State,Typename,Field_info) ->
 	FieldInfo = [{atom_to_list(Field),Name} || {Field,Name} <- Field_info],
 	Entry_layout = create_entry_layout(Typename, FieldInfo),
-	Header = <<16#FAB1000A:?ZnInt>>,
+	Header = <<16#FAB2000A:?ZnInt>>,
     ok = gen_tcp:send(State#state.socket, <<Header/binary,Entry_layout/binary>>),
 	{ok,<<Reply_code:?ZnLong>>} = gen_tcp:recv(State#state.socket,8),
 	case Reply_code of
