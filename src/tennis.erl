@@ -44,22 +44,22 @@ play(Type) ->
 	{ok,S1} = fly:register_entry(S,{ball,{atom}}),
 	
 	case Type of
-		rec -> rec(ping,S1);
-		serve -> serve(ping,S1)
+		rec -> rec(ping,S1,0);
+		serve -> serve(ping,S1,0)
 	end	.
 %%
 %% Local Functions
 %%
 
-serve(Ball, State) ->
+serve(Ball, State,Count) ->
 	{write,10000} = fly:write(State, ball,{Ball},10000),
-	io:fwrite("Served ~w~n",[Ball]),
-	rec(switch_ball(Ball), State).
+	io:fwrite("Served ~w - #~w~n",[Ball,Count]),
+	rec(switch_ball(Ball), State,Count+1).
 
-rec(Ball, State) ->
-	{take,1,{Ball}} = fly:take(State, ball,{Ball},10000),
-	io:fwrite("Received ~w~n",[Ball]),
-	serve(switch_ball(Ball), State).
+rec(Ball, State,Count) ->
+	{take,1,{Ball}} = fly:take(State, ball,{Ball},{10000,10}),
+	io:fwrite("Received ~w - #~w~n",[Ball,Count]),
+	serve(switch_ball(Ball), State,Count+1).
 
 switch_ball(Ball) ->
 	case Ball of

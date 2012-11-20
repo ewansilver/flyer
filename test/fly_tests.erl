@@ -102,10 +102,11 @@ check_can_mimic_a_blocking_take_test() ->
 	State = test_connect(),
 	{ok,State1} = fly:register_entry(State,{Type,{string,string,int,atom}}),
 		%% Check that we can mimic a blocking read and take 
-	Pause=500,
+	MaxTime = 500,
+	Pause={MaxTime,10},
 	Now  = erlang:now(),
 	{take,0,{}} = fly:take(State1,Type, {"","",100,""},Pause),
-	true = Pause*1000 < timer:now_diff(erlang:now(),Now),
+	true = MaxTime*1000 < timer:now_diff(erlang:now(),Now),
 	fly:close(State1).
 
 check_an_empty_read_test() ->

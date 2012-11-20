@@ -73,12 +73,16 @@ ping(State) ->
 	{ping, get_tags(Response,[])}.
 
 %% Return: {read,number of matches: 1 or 0,Entry or any empty tuple}
-read(State,Type_name, Template, Wait_time) ->
+read(_State,_Type_name, _Template, {Time_left,_Repeat_time}) when Time_left < 0 ->
+	{read,0,{}};
+read(State,Type_name, Template, {Time_left,Repeat_time}) ->
 	case read(State,Type_name, Template) of
-		{read,0,{}} -> pause(Wait_time),
-					   read(State,Type_name, Template);
+		{read,0,{}} -> pause(Repeat_time),
+					   read(State,Type_name, Template,{Time_left-Repeat_time,Repeat_time});
 		Else-> Else
-	end.
+	end;
+read(State,Type_name, Template, Time_left) ->
+	read(State,Type_name, Template, {Time_left,Time_left}).
 					   
 read(State,Type_name, Template) ->
 	case lists:keysearch(Type_name, 1,State#state.type_structures) of
@@ -91,12 +95,16 @@ read(State,Type_name, Template) ->
 	end.
 
 %% Return: {take,number of matches: 1 or 0,Entry or any empty tuple}
-take(State,Type_name, Template, Wait_time) ->
+take(_State,_Type_name, _Template, {Time_left,_Repeat_time}) when Time_left < 0 ->
+	{take,0,{}};
+take(State,Type_name, Template, {Time_left,Repeat_time}) ->
 	case take(State,Type_name, Template) of
-		{take,0,{}} -> pause(Wait_time),
-					   take(State,Type_name, Template);
+		{take,0,{}} -> pause(Repeat_time),
+					   take(State,Type_name, Template,{Time_left-Repeat_time,Repeat_time});
 		Else-> Else
-	end.
+	end;
+take(State,Type_name, Template, Time_left) ->
+	take(State,Type_name, Template, {Time_left,Time_left}).
 
 take(State,Type_name, Template) ->
 	case lists:keysearch(Type_name, 1,State#state.type_structures) of
