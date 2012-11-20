@@ -48,6 +48,7 @@
 %%
 -define(ZnInt, 32/big).
 -define(ZnLong, 64/big).
+-define(ZnUUID, 128/big).
 
 connect() ->
 	connect("localhost",4396).
@@ -95,12 +96,13 @@ parse_single_entry_responses(Type,Sock,Field_info,Request_binary, Wait_time) ->
 	Remaining_time = pause(Wait_time, 100),
 	ok = gen_tcp:send(Sock, Request_binary),
 	{ok,<<Num_fields:?ZnLong>>} = gen_tcp:recv(Sock,8),
+	
 	case Num_fields of
 		0 -> case Remaining_time of
 				0 -> {Type,0, {}};
 				_ -> parse_single_entry_responses(Type, Sock, Field_info, Request_binary, Remaining_time)
 			 end;
-		_ -> {ok,Binary} = gen_tcp:recv(Sock,0),
+		_ -> {ok,<<UUID:?ZnUUID,Binary/binary>>} = gen_tcp:recv(Sock,0),
 			{Entry,_} = get_object(Num_fields,Binary,Field_info),
 			{Type, 1,Entry}
 	end.
@@ -117,10 +119,12 @@ write(State,Type_name, Template, Lease) ->
 	case lists:keysearch(Type_name, 1,State#state.type_structures) of
 		false -> {fail, missing_type};
 		{value,{_,Type_channel,_,_}} ->
-			Template_entry = create_Zn_entry(Template),
+			ID_entry = create_id_object(create_Zn_entry(Template)),
 			Header = <<16#FAB20003:?ZnInt>>,
-		    ok = gen_tcp:send(State#state.socket, <<Header/binary,Type_channel:?ZnInt, Template_entry/binary,Lease:?ZnLong>>),
-			{ok,<<Lease_granted:?ZnLong>>} = gen_tcp:recv(State#state.socket,8),
+			Timeout = 1000,
+		    ok = gen_tcp:send(State#state.socket, <<Header/binary,Type_channel:?ZnInt, ID_entry/binary,Lease:?ZnLong>>),
+%%io:format("~p ~p\n",["Written",ID_entry]),
+			{ok,<<Lease_granted:?ZnLong>>} = gen_tcp:recv(State#state.socket,0,Timeout),
 			{write,Lease_granted}
 	end.
 
@@ -228,6 +232,10 @@ create_binary_object(Binary) ->
 decode_Zn_object(<<Size:?ZnInt,Object:Size/binary,Remainder/binary>>) ->
 	{Size,Object,Remainder}.
 
+create_id_object(<<Length:?ZnInt,Objects/binary>>) ->
+	UUID = <<16#123:?ZnUUID>>,
+	<<Length:?ZnInt,UUID/binary,Objects/binary>>.
+
 %% Objects = [Object]
 create_Zn_entry(Objects) when is_list(Objects) ->
 	Length = length(Objects),
@@ -235,7 +243,7 @@ create_Zn_entry(Objects) when is_list(Objects) ->
 create_Zn_entry(Tuple) ->
 	create_Zn_entry(lists:map(fun(Element) -> encode_Zn_object(Element) end, tuple_to_list(Tuple))).
 
-get_Zn_entry(<<Num_of_fields:?ZnLong,Binary/binary>>,FieldTypes) ->
+get_Zn_entry(<<Num_of_fields:?ZnLong,UUID1:?ZnLong,UUID2:?ZnLong,Binary/binary>>,FieldTypes) ->
 	{Fields,RemainingBinary} = get_object(Num_of_fields,Binary,FieldTypes),
 	{Fields,RemainingBinary}.
 

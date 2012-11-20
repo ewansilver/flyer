@@ -97,13 +97,28 @@ check_can_mimic_a_blocking_read_test() ->
 	true = Pause*1000 < timer:now_diff(erlang:now(),Now),
 	fly:close(State1).
 
+check_an_empty_read_test() ->
+		%% Ensure that an empty read is properly handled.
+	Type = check_an_empty_read_test,
+	State = test_connect(),
+	{ok,State1} = fly:register_entry(State,{Type,{atom,tuple}}),
+	{read,0,{}} = fly:read(State1, Type, {test,""}, 100),
+	fly:close(State1).
+
+check_an_empty_take_test() ->
+		%% Ensure that an empty take is properly handled.
+	Type = check_an_empty_take_test,
+	State = test_connect(),
+	{ok,State1} = fly:register_entry(State,{Type,{atom,tuple}}),
+	{take,0,{}} = fly:take(State1, Type, {test,""}, 100),
+	fly:close(State1).
+
 check_we_can_use_a_generic_tuple_test() ->
 		%% Check we can send in a generic tuple
 	Type = generic_tuple,
 	State = test_connect(),
 	{ok,State1} = fly:register_entry(State,{Type,{atom,tuple}}),
-
-	{write,1000} = fly:write(State1, Type,{test,{a,tuple,"of",[1,2,4,"things"]}},1000),	
+	{write,1000} = fly:write(State1, Type,{test,{a,tuple,"of",[1,2,4,"things"]}},1000),
 	{read,1,{test,{a,tuple,"of",[1,2,4,"things"]}}} = fly:read(State1, Type, {test,""}, 1000),
 	{read,1,{test,{a,tuple,"of",[1,2,4,"things"]}}} = fly:read(State1, Type, {"",{a,tuple,"of",[1,2,4,"things"]}}, 1000),
 	{take,1,{test,{a,tuple,"of",[1,2,4,"things"]}}} = fly:take(State1, Type, {test,""}, 1000),
