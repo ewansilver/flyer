@@ -34,8 +34,10 @@
 %%
 -export([connect/0, connect/2,close/1,
 		 ping/1,
+		 read/3,
 		 read/4,
 		 write/4,
+		 take/3,
 		 take/4,
 		 read_many/4,
 		 take_many/4,
@@ -72,47 +74,53 @@ ping(State) ->
 
 %% Return: {read,number of matches: 1 or 0,Entry or any empty tuple}
 read(State,Type_name, Template, Wait_time) ->
+	case read(State,Type_name, Template) of
+		{read,0,{}} -> pause(Wait_time),
+					   read(State,Type_name, Template);
+		Else-> Else
+	end.
+					   
+read(State,Type_name, Template) ->
 	case lists:keysearch(Type_name, 1,State#state.type_structures) of
 		false -> {fail, missing_type};
 		{value,{_,Type_channel,_,Field_info}} ->
 			Template_entry = create_Zn_entry(Template),
 			Header = <<16#FAB20001:?ZnInt>>,
-			Binary = <<Header/binary,Type_channel:?ZnInt, Template_entry/binary,Wait_time:?ZnLong>>,
-			parse_single_entry_responses(read,State#state.socket,Field_info,Binary,Wait_time)
+			Binary = <<Header/binary,Type_channel:?ZnInt, Template_entry/binary,0:?ZnLong>>,
+			parse_single_entry_responses(read,State#state.socket,Field_info,Binary)
 	end.
 
 %% Return: {take,number of matches: 1 or 0,Entry or any empty tuple}
 take(State,Type_name, Template, Wait_time) ->
+	case take(State,Type_name, Template) of
+		{take,0,{}} -> pause(Wait_time),
+					   take(State,Type_name, Template);
+		Else-> Else
+	end.
+
+take(State,Type_name, Template) ->
 	case lists:keysearch(Type_name, 1,State#state.type_structures) of
 		false -> {fail, missing_type};
 		{value,{_,Type_channel,_,Field_info}} ->
 			Template_entry = create_Zn_entry(Template),
 			Header = <<16#FAB20002:?ZnInt>>,
-			Binary = <<Header/binary,Type_channel:?ZnInt, Template_entry/binary,Wait_time:?ZnLong>>,
-			parse_single_entry_responses(take,State#state.socket,Field_info, Binary, Wait_time)
+			Binary = <<Header/binary,Type_channel:?ZnInt, Template_entry/binary,0:?ZnLong>>,
+			parse_single_entry_responses(take,State#state.socket,Field_info, Binary)
 	end.
 
-parse_single_entry_responses(Type,Sock,Field_info,Request_binary, Wait_time) ->
-	Remaining_time = pause(Wait_time, 100),
+parse_single_entry_responses(Type,Sock,Field_info,Request_binary) ->
 	ok = gen_tcp:send(Sock, Request_binary),
 	{ok,<<Num_fields:?ZnLong>>} = gen_tcp:recv(Sock,8),
 	
 	case Num_fields of
-		0 -> case Remaining_time of
-				0 -> {Type,0, {}};
-				_ -> parse_single_entry_responses(Type, Sock, Field_info, Request_binary, Remaining_time)
-			 end;
-		_ -> {ok,<<UUID:?ZnUUID,Binary/binary>>} = gen_tcp:recv(Sock,0),
+		0 -> {Type,0, {}};
+		_ -> {ok,<<_UUID:?ZnUUID,Binary/binary>>} = gen_tcp:recv(Sock,0),
 			{Entry,_} = get_object(Num_fields,Binary,Field_info),
 			{Type, 1,Entry}
 	end.
 
-pause(Remaining_time,Wait) when Remaining_time < Wait ->
-	timer:sleep(Remaining_time),
-	0;
-pause(Remaining_time,Wait) ->
-	timer:sleep(Wait),
-	(Remaining_time-Wait).
+pause(Wait) ->
+	timer:sleep(Wait).
 
 %% Return: {write,Lease time in ms}
 write(State,Type_name, Template, Lease) ->

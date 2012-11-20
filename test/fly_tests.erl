@@ -53,8 +53,8 @@ ensure_a_missing_type_fails_test() ->
 	
 		%% Check what happens if ask for an entry type that is not present
 	{fail, missing_type} = fly:write(State, missing,{"Ewan","Silver",100, male},1000),
-	{fail, missing_type} = fly:read(State, missing,{"","",100, ""},1000),
-	{fail, missing_type} = fly:take(State, missing,{"","",100, ""},1000),
+	{fail, missing_type} = fly:read(State, missing,{"","",100, ""}),
+	{fail, missing_type} = fly:take(State, missing,{"","",100, ""}),
 	{fail, missing_type} = fly:read_many(State,missing, {"","",100,""},10),	
 	{fail, missing_type} = fly:take_many(State,missing, {"","",100,""},10),
 	fly:close(State).
@@ -67,9 +67,9 @@ check_can_write_read_and_take_all_formats_test() ->
 
 	{write,1000} = fly:write(State1, Type,{"Ewan","Silver",100, male},1000),	
 	{write,1000} = fly:write(State1, Type,{"Alison","Silver",100, female},1000),
-	{read,1,{"Ewan","Silver",100,male}} = fly:read(State1, Type, {"Ewan","","",""}, 1000),
-	{read,1,{"Ewan","Silver",100,male}} = fly:read(State1, Type, {"","",100,""}, 1000),
-	{read,1,{"Alison","Silver",100,female}} = fly:read(State1, Type, {"","","",female}, 1000),
+	{read,1,{"Ewan","Silver",100,male}} = fly:read(State1, Type, {"Ewan","","",""}),
+	{read,1,{"Ewan","Silver",100,male}} = fly:read(State1, Type, {"","",100,""}),
+	{read,1,{"Alison","Silver",100,female}} = fly:read(State1, Type, {"","","",female}),
 	
 	{read_many,2,ReadList} = fly:read_many(State1,Type, {"","",100,""},10),	
 	{take_many,2,TakeList} = fly:take_many(State1,Type, {"","",100,""},10),
@@ -93,6 +93,17 @@ check_can_mimic_a_blocking_read_test() ->
 		%% Check that we can mimic a blocking read and take 
 	Pause=500,
 	Now  = erlang:now(),
+	{read,0,{}} = fly:read(State1,Type, {"","",100,""},Pause),
+	true = Pause*1000 < timer:now_diff(erlang:now(),Now),
+	fly:close(State1).
+
+check_can_mimic_a_blocking_take_test() ->
+	Type = check_can_mimic_a_blocking_take_test,
+	State = test_connect(),
+	{ok,State1} = fly:register_entry(State,{Type,{string,string,int,atom}}),
+		%% Check that we can mimic a blocking read and take 
+	Pause=500,
+	Now  = erlang:now(),
 	{take,0,{}} = fly:take(State1,Type, {"","",100,""},Pause),
 	true = Pause*1000 < timer:now_diff(erlang:now(),Now),
 	fly:close(State1).
@@ -102,7 +113,7 @@ check_an_empty_read_test() ->
 	Type = check_an_empty_read_test,
 	State = test_connect(),
 	{ok,State1} = fly:register_entry(State,{Type,{atom,tuple}}),
-	{read,0,{}} = fly:read(State1, Type, {test,""}, 100),
+	{read,0,{}} = fly:read(State1, Type, {test,""}),
 	fly:close(State1).
 
 check_an_empty_take_test() ->
@@ -110,7 +121,7 @@ check_an_empty_take_test() ->
 	Type = check_an_empty_take_test,
 	State = test_connect(),
 	{ok,State1} = fly:register_entry(State,{Type,{atom,tuple}}),
-	{take,0,{}} = fly:take(State1, Type, {test,""}, 100),
+	{take,0,{}} = fly:take(State1, Type, {test,""}),
 	fly:close(State1).
 
 check_we_can_use_a_generic_tuple_test() ->
@@ -119,9 +130,9 @@ check_we_can_use_a_generic_tuple_test() ->
 	State = test_connect(),
 	{ok,State1} = fly:register_entry(State,{Type,{atom,tuple}}),
 	{write,1000} = fly:write(State1, Type,{test,{a,tuple,"of",[1,2,4,"things"]}},1000),
-	{read,1,{test,{a,tuple,"of",[1,2,4,"things"]}}} = fly:read(State1, Type, {test,""}, 1000),
-	{read,1,{test,{a,tuple,"of",[1,2,4,"things"]}}} = fly:read(State1, Type, {"",{a,tuple,"of",[1,2,4,"things"]}}, 1000),
-	{take,1,{test,{a,tuple,"of",[1,2,4,"things"]}}} = fly:take(State1, Type, {test,""}, 1000),
+	{read,1,{test,{a,tuple,"of",[1,2,4,"things"]}}} = fly:read(State1, Type, {test,""}),
+	{read,1,{test,{a,tuple,"of",[1,2,4,"things"]}}} = fly:read(State1, Type, {"",{a,tuple,"of",[1,2,4,"things"]}}),
+	{take,1,{test,{a,tuple,"of",[1,2,4,"things"]}}} = fly:take(State1, Type, {test,""}),
 	fly:close(State1).
 
 check_we_can_use_a_generic_list_test() ->
@@ -131,9 +142,9 @@ check_we_can_use_a_generic_list_test() ->
 	{ok,State1} = fly:register_entry(State,{Type,{atom,list}}),
 	List = [1,2,3],
 	{write,1000} = fly:write(State1, Type,{test,List},1000),	
-	{read,1,{test,List}} = fly:read(State1, Type, {test,""}, 1000),
-	{read,1,{test,List}} = fly:read(State1, Type, {"",List}, 1000),
-	{take,1,{test,List}} = fly:take(State1, Type, {test,""}, 1000),
+	{read,1,{test,List}} = fly:read(State1, Type, {test,""}),
+	{read,1,{test,List}} = fly:read(State1, Type, {"",List}),
+	{take,1,{test,List}} = fly:take(State1, Type, {test,""}),
 	fly:close(State1).
 
 check_we_can_use_a_generic_binary_test() ->
@@ -141,12 +152,12 @@ check_we_can_use_a_generic_binary_test() ->
 	State = test_connect(),
 	{ok,State1} = fly:register_entry(State,{Type,{atom,binary}}),
 	Binary = term_to_binary(arandomterm),
-	{read,0,{}} = fly:read(State1, Type, {binarytest,""}, 1000),
+	{read,0,{}} = fly:read(State1, Type, {binarytest,""}),
 	{write,1000} = fly:write(State1, Type,{binarytest,Binary},1000),	
-	{read,1,{binarytest,Binary}} = fly:read(State1, Type, {binarytest,""}, 1000),
-	{read,1,{binarytest,Binary}} = fly:read(State1, Type, {"",Binary}, 1000),
-	{take,1,{binarytest,Binary}} = fly:take(State1, Type, {binarytest,""}, 1000),
-	{read,0,{}} = fly:read(State1, Type, {binarytest,""}, 1000),
+	{read,1,{binarytest,Binary}} = fly:read(State1, Type, {binarytest,""}),
+	{read,1,{binarytest,Binary}} = fly:read(State1, Type, {"",Binary}),
+	{take,1,{binarytest,Binary}} = fly:take(State1, Type, {binarytest,""}),
+	{read,0,{}} = fly:read(State1, Type, {binarytest,""}),
 	fly:close(State1).
 
 	
@@ -173,15 +184,15 @@ big_test() ->
 
 	{read_many,2,[_,_]} = fly:read_many(State1,Person, {"","Silver","",""},10),	
 
-	{read,1,{"Monty","Silver",2,male}} = fly:read(State1,Person, {"Monty","","",""}, 1000),
-	{read,1,{"Elliot","Silver",6,male}} = fly:read(State1,Person, {"","",6,""}, 1000),
+	{read,1,{"Monty","Silver",2,male}} = fly:read(State1,Person, {"Monty","","",""}),
+	{read,1,{"Elliot","Silver",6,male}} = fly:read(State1,Person, {"","",6,""}),
 
-	{take,1,{"Monty","Silver",2,male}} = fly:take(State1, Person, {"Monty","",""}, 1000),
-	{take,1,{"Elliot","Silver",6,male}} = fly:take(State1, Person, {"","",6,""}, 1000),
+	{take,1,{"Monty","Silver",2,male}} = fly:take(State1, Person, {"Monty","",""}),
+	{take,1,{"Elliot","Silver",6,male}} = fly:take(State1, Person, {"","",6,""}),
 
 %% Check that the space is now empty again. Use all available checking calls.	
-	{take,0,{}} = fly:take(State1,Person,{"","Silver","",""}, 1),
-	{read,0,{}} = fly:read(State1,Person,{"","Silver","",""}, 10),
+	{take,0,{}} = fly:take(State1,Person,{"","Silver","",""}),
+	{read,0,{}} = fly:read(State1,Person,{"","Silver","",""}),
 	{read_many,0,[]} = fly:read_many(State1,Person, {"","Silver","",""},10),	
 	
 %% Finally we want to check that we can take multiple entries in one go.
@@ -189,8 +200,8 @@ big_test() ->
 	{write,1001} = fly:write(State1, Person,{"Elliot","Silver",6,""},1001),
 	{read_many,2,[_,_]} = fly:read_many(State1, Person, {"","Silver","",""},10),	
 	{take_many,2,[_,_]} = fly:take_many(State1, Person, {"","Silver","",""},10),	
-	{take,0,{}} = fly:take(State1, Person,{"","Silver","",""}, 1),
-	{read,0,{}} = fly:read(State1, Person,{"","Silver","",""}, 10),
+	{take,0,{}} = fly:take(State1, Person,{"","Silver","",""}),
+	{read,0,{}} = fly:read(State1, Person,{"","Silver","",""}),
 	{read_many,0,[]} = fly:read_many(State1, Person, {"","Silver","",""},10),
 	{take_many,0,[]} = fly:take_many(State1, Person, {"","Silver","",""},10),	
 	
@@ -208,7 +219,7 @@ atom_test() ->
 	Person = atom_person,
 	{ok,State1} = fly:register_entry(State,Person,[{string,"name"},{atom,"sex"}]),
 	{write,1000} = fly:write(State1,Person,{"Monty", male},1000),
-	{read,1,{"Monty",male}} = fly:read(State1,Person, {"Monty",""}, 1000),
+	{read,1,{"Monty",male}} = fly:read(State1,Person, {"Monty",""}),
 	fly:close(State1).
 
 contains(Elem,List) ->
