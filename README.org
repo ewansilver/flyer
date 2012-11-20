@@ -13,5 +13,5 @@ Build and run tests:
 
 This is obviously work in progress. Moved over from https://bitbucket.org/fly_er/flyer/
 
-It has no OTP support, etc. Just the basic binary protocol wrapped in a simple spawned process.s
+It has no OTP support, etc. Just the basic binary protocol wrapped in a simple spawned process. It uses version 2.0 of the Fly Binary Protocol.
 
