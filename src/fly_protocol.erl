@@ -73,53 +73,39 @@ ping(State) ->
 	{ping, get_tags(Response,[])}.
 
 %% Return: {read,number of matches: 1 or 0,Entry or any empty tuple}
-read(_State,_Type_name, _Template, {Time_left,_Repeat_time}) when Time_left < 0 ->
-	{read,0,{}};
-read(State,Type_name, Template, {Time_left,Repeat_time}) ->
-	case read(State,Type_name, Template) of
-		{read,0,{}} -> pause(Repeat_time),
-					   read(State,Type_name, Template,{Time_left-Repeat_time,Repeat_time});
-		Else-> Else
-	end;
-read(State,Type_name, Template, Time_left) ->
-	read(State,Type_name, Template, {Time_left,Time_left}).
-					   
-read(State,Type_name, Template) ->
-	case lists:keysearch(Type_name, 1,State#state.type_structures) of
-		false -> {fail, missing_type};
-		{value,{_,Type_channel,_,Field_info}} ->
-			Template_entry = create_Zn_entry(Template),
-			Header = <<16#FAB20001:?ZnInt>>,
-			Binary = <<Header/binary,Type_channel:?ZnInt, Template_entry/binary,0:?ZnLong>>,
-			parse_single_entry_responses(read,State#state.socket,Field_info,Binary)
-	end.
+read(State,Type, Template) ->
+	handle(read,<<16#FAB20001:?ZnInt>>,State,Type, Template).
+read(State,Type, Template, Time) ->
+	handle(read,<<16#FAB20001:?ZnInt>>,State,Type, Template, Time).
 
 %% Return: {take,number of matches: 1 or 0,Entry or any empty tuple}
-take(_State,_Type_name, _Template, {Time_left,_Repeat_time}) when Time_left < 0 ->
-	{take,0,{}};
-take(State,Type_name, Template, {Time_left,Repeat_time}) ->
-	case take(State,Type_name, Template) of
-		{take,0,{}} -> pause(Repeat_time),
-					   take(State,Type_name, Template,{Time_left-Repeat_time,Repeat_time});
-		Else-> Else
-	end;
-take(State,Type_name, Template, Time_left) ->
-	take(State,Type_name, Template, {Time_left,Time_left}).
+take(State, Type, Template) ->
+	handle(take,<<16#FAB20002:?ZnInt>>,State,Type, Template).
+take(State, Type, Template, Time) ->
+	handle(take,<<16#FAB20002:?ZnInt>>,State,Type, Template, Time).
 
-take(State,Type_name, Template) ->
-	case lists:keysearch(Type_name, 1,State#state.type_structures) of
+handle(Action, Header, State, Type, Template) ->
+	case lists:keysearch(Type, 1,State#state.type_structures) of
 		false -> {fail, missing_type};
 		{value,{_,Type_channel,_,Field_info}} ->
 			Template_entry = create_Zn_entry(Template),
-			Header = <<16#FAB20002:?ZnInt>>,
 			Binary = <<Header/binary,Type_channel:?ZnInt, Template_entry/binary,0:?ZnLong>>,
-			parse_single_entry_responses(take,State#state.socket,Field_info, Binary)
+			parse_single_entry_responses(Action,State#state.socket,Field_info,Binary)
 	end.
+handle(Action, Header, State, Type, Template, {Time,_R})  when Time < 0 ->
+	handle(Action, Header, State, Type, Template);
+handle(Action, Header, State, Type, Template, {Time,Repeat}) ->
+	case handle(Action, Header, State, Type, Template) of
+		{Action,0,{}} -> pause(Repeat),
+						 handle(Action,Header,State,Type, Template,{Time-Repeat,Repeat});
+		Else-> Else
+	end;
+handle(Action, Header, State, Type, Template, Time) ->
+	handle(Action, Header, State, Type, Template, {Time,Time}).
 
 parse_single_entry_responses(Type,Sock,Field_info,Request_binary) ->
 	ok = gen_tcp:send(Sock, Request_binary),
 	{ok,<<Num_fields:?ZnLong>>} = gen_tcp:recv(Sock,8),
-	
 	case Num_fields of
 		0 -> {Type,0, {}};
 		_ -> {ok,<<_UUID:?ZnUUID,Binary/binary>>} = gen_tcp:recv(Sock,0),
@@ -131,22 +117,21 @@ pause(Wait) ->
 	timer:sleep(Wait).
 
 %% Return: {write,Lease time in ms}
-write(State,Type_name, Template, Lease) ->
-	case lists:keysearch(Type_name, 1,State#state.type_structures) of
+write(State,Type, Template, Lease) ->
+	case lists:keysearch(Type, 1,State#state.type_structures) of
 		false -> {fail, missing_type};
 		{value,{_,Type_channel,_,_}} ->
 			ID_entry = create_id_object(create_Zn_entry(Template)),
 			Header = <<16#FAB20003:?ZnInt>>,
 			Timeout = 1000,
 		    ok = gen_tcp:send(State#state.socket, <<Header/binary,Type_channel:?ZnInt, ID_entry/binary,Lease:?ZnLong>>),
-%%io:format("~p ~p\n",["Written",ID_entry]),
 			{ok,<<Lease_granted:?ZnLong>>} = gen_tcp:recv(State#state.socket,0,Timeout),
 			{write,Lease_granted}
 	end.
 
 %% Return: {read_many,number of matches,list of entries - could be empty}
-read_many(State,Type_name, Template, Limit) ->
-	case lists:keysearch(Type_name, 1,State#state.type_structures) of
+read_many(State,Type, Template, Limit) ->
+	case lists:keysearch(Type, 1,State#state.type_structures) of
 		false -> {fail, missing_type};
 		{value,{_,Type_channel,_,Field_info}} ->
 			Template_entry = create_Zn_entry(Template),
@@ -159,8 +144,8 @@ read_many(State,Type_name, Template, Limit) ->
 	end.
 
 %% Return: {take_many,number of matches,list of entries - could be empty}
-take_many(State,Type_name, Template, Limit) ->
-	case lists:keysearch(Type_name, 1,State#state.type_structures) of
+take_many(State,Type, Template, Limit) ->
+	case lists:keysearch(Type, 1,State#state.type_structures) of
 		false -> {fail, missing_type};
 		{value,{_,Type_channel,_,Field_info}} ->
 			Template_entry = create_Zn_entry(Template),
@@ -212,7 +197,7 @@ create_entry_layout(Typename,FieldInfo) ->
 	FI_Length = length(FieldInfo),
 	FI_fun = fun({FieldType,FieldName},Binary) -> TypeString = create_Zn_string(FieldType),
 												  NameString = create_Zn_string(FieldName),
-					 								<<Binary/binary,TypeString/binary,NameString/binary>> end,
+												  <<Binary/binary,TypeString/binary,NameString/binary>> end,
 	FI_binaries = lists:foldl(FI_fun,<<FI_Length:?ZnInt>>,FieldInfo),
 	<<Typename_bin/binary,0:?ZnInt,FI_binaries/binary>>.
 
@@ -259,7 +244,7 @@ create_Zn_entry(Objects) when is_list(Objects) ->
 create_Zn_entry(Tuple) ->
 	create_Zn_entry(lists:map(fun(Element) -> encode_Zn_object(Element) end, tuple_to_list(Tuple))).
 
-get_Zn_entry(<<Num_of_fields:?ZnLong,UUID1:?ZnLong,UUID2:?ZnLong,Binary/binary>>,FieldTypes) ->
+get_Zn_entry(<<Num_of_fields:?ZnLong,_UUID:?ZnUUID,Binary/binary>>,FieldTypes) ->
 	{Fields,RemainingBinary} = get_object(Num_of_fields,Binary,FieldTypes),
 	{Fields,RemainingBinary}.
 
@@ -280,9 +265,6 @@ remove_field_names([],Acc,_) ->
 remove_field_names([_Name,Type|T],Acc,[F|FieldTypes]) -> 
 	remove_field_names(T,[decode_field_type(Type,F)|Acc],FieldTypes).
 
-%% Todo: Decode field type is the place we will work out how to deserialise things into something other than strings in the future.
-%% We should be able to return atoms and terms to!
-%% TODO: not sure why the binary is needed here. It seems to die on read_many if I don't catch an empty binary here.
 decode_field_type(<<>>,_) -> 
 	<<>>;
 decode_field_type(Field,{Type,_}) -> 
