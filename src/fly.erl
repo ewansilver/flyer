@@ -39,8 +39,8 @@
 		 write/3,
 %%		 take/3,
 %%		 take/4,
-%%		 read_many/4,
-%%		 take_many/4,
+		 read_many/3,
+		 take_many/3,
 %%		 register_entry/2,
 		 register/2]).
 
@@ -64,7 +64,7 @@ ping() ->
 
 register(Typename,Field_info) ->
 	gen_server:call(?MODULE,{register,Typename,Field_info}).
-
+  
 read(Typename, Template) ->
 	gen_server:call(?MODULE,{read,Typename,Template}).
 
@@ -73,7 +73,13 @@ take(Typename, Template) ->
 
 write(Typename, Template, Lease) ->
 	gen_server:call(?MODULE,{write,Typename,Template,Lease}).
-	
+  
+read_many(Typename, Template, Limit) ->
+	gen_server:call(?MODULE,{read_many,Typename,Template,Limit}).
+
+take_many(Typename, Template, Limit) ->
+	gen_server:call(?MODULE,{take_many,Typename,Template,Limit}).
+
 %% ====================================================================
 %% Server functions
 %% ====================================================================
@@ -104,8 +110,12 @@ handle_call({ping}, _From, State) ->
 	{ping,Tags} = fly_protocol:ping(State#state.state),
     Reply = Tags,
     {reply, Reply, State};
-handle_call({register,Typename,Field_info}, _rom, State) ->
+handle_call({register,Typename,Field_info}, _From, State) when is_tuple(Field_info) ->
 	{ok,S} = fly_protocol:register_entry(State#state.state,{Typename,Field_info}),
+    Reply = ok,
+	{reply, Reply, State#state{state=S}};
+handle_call({register,Typename,Field_info}, _From, State) when is_list(Field_info) ->
+	{ok,S} = fly_protocol:register_entry(State#state.state,Typename,Field_info),
     Reply = ok,
 	{reply, Reply, State#state{state=S}};
 handle_call({read,Typename,Template}, _From, State) ->
@@ -118,10 +128,22 @@ handle_call({write,Typename,Template,Lease}, _From, State) ->
 	{write,L} = fly_protocol:write(State#state.state,Typename,Template,Lease),
 	Reply = {ok,L},
     {reply, Reply, State};
+handle_call({read_many,Typename,Template,Limit}, _From, State) ->
+	{read_many,Num,Entries} = fly_protocol:read_many(State#state.state,Typename, Template, Limit),
+	Reply = {read_many,Num,Entries},
+    {reply, Reply, State};
+handle_call({take_many,Typename,Template,Limit}, _From, State) ->
+	{take_many,Num,Entries} = fly_protocol:take_many(State#state.state,Typename, Template, Limit),
+	Reply = {take_many,Num,Entries},
+    {reply, Reply, State};
 handle_call({stop}, _From, State) ->
 	Reply = fly_protocol:close(State#state.state),
 	{stop, normal, shutdown_ok, State}.
 
+
+
+  
+  
 %% --------------------------------------------------------------------
 %% Function: handle_cast/2
 %% Description: Handling cast messages
